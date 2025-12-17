@@ -1,109 +1,129 @@
+# Generation ID: Hutch_1765945221079_jjbnfyfvl (前半)
 
 def myai(board, color):
     """
-    オセロAI: 最も多くの石がとれる位置を返す
-    board: 2次元配列(6x6 or 8x8)
-    color: 置く色(1=BLACK, 2=WHITE)
-    戻り値: (column, row)
+    オセロAI: 3手先を読んで最適な手を決定
+    board: 8x8のオセロ盤 (0=空, 1=黒, 2=白)
+    color: 自分の色 (1=黒, 2=白)
+    return: (column, row) の置き位置
     """
     
-    opponent_color = 3 - color
-    board_size = len(board)
+    EVAL_TABLE = [
+        [100, -40,  20,   5,   5,  20, -40, 100],
+        [-40, -80,  -1,  -1,  -1,  -1, -80, -40],
+        [ 20,  -1,   5,   1,   1,   5,  -1,  20],
+        [  5,  -1,   1,   0,   0,   1,  -1,   5],
+        [  5,  -1,   1,   0,   0,   1,  -1,   5],
+        [ 20,  -1,   5,   1,   1,   5,  -1,  20],
+        [-40, -80,  -1,  -1,  -1,  -1, -80, -40],
+        [100, -40,  20,   5,   5,  20, -40, 100]
+    ]
     
-    def is_valid(r, c):
-        return 0 <= r < board_size and 0 <= c < board_size
+    def get_opponent(c):
+        return 3 - c
     
-    def count_flips(board, row, col, color):
-        """指定位置に置いた場合、ひっくり返される石の数を計算"""
-        if board[row][col] != 0:
-            return 0
+    def is_valid_move(b, c, col, row):
+        if b[row][col] != 0:
+            return False
         
-        opponent = 3 - color
-        flips = 0
+        opponent = get_opponent(c)
+        directions = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
         
-        directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), 
-                     (0, 1), (1, -1), (1, 0), (1, 1)]
-        
-        for dr, dc in directions:
-            temp_flips = 0
-            r, c = row + dr, col + dc
-            
-            while is_valid(r, c) and board[r][c] == opponent:
-                temp_flips += 1
-                r += dr
-                c += dc
-            
-            if is_valid(r, c) and board[r][c] == color:
-                flips += temp_flips
-        
-        return flips
+        for dx, dy in directions:
+            x, y = col + dx, row + dy
+            if 0 <= x < 8 and 0 <= y < 8 and b[y][x] == opponent:
+                while 0 <= x < 8 and 0 <= y < 8:
+                    if b[y][x] == 0:
+                        break
+                    if b[y][x] == c:
+                        return True
+                    x += dx
+                    y += dy
+        return False
     
-    def get_valid_moves(board, color):
-        """打てる位置のリストを返す"""
-        valid = []
-        for r in range(board_size):
-            for c in range(board_size):
-                if board[r][c] == 0 and count_flips(board, r, c, color) > 0:
-                    valid.append((r, c))
-        return valid
+    def get_valid_moves(b, c):
+        moves = []
+        for row in range(8):
+            for col in range(8):
+                if is_valid_move(b, c, col, row):
+                    moves.append((col, row))
+        return moves
     
-    def get_corner_distance(r, c, size):
-        """隅までの距離を計算"""
-        corners = [(0, 0), (0, size-1), (size-1, 0), (size-1, size-1)]
-        return min(abs(r - cr) + abs(c - cc) for cr, cc in corners)
+    def apply_move(b, c, col, row):
+        new_board = [row[:] for row in b]
+        new_board[row][col] = c
+        opponent = get_opponent(c)
+        directions = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]
+        
+        for dx, dy in directions:
+            x, y = col + dx, row + dy
+            flips = []
+            while 0 <= x < 8 and 0 <= y < 8 and new_board[y][x] == opponent:
+                flips.append((x, y))
+                x += dx
+                y += dy
+            if 0 <= x < 8 and 0 <= y < 8 and new_board[y][x] == c and flips:
+                for fx, fy in flips:
+                    new_board[fy][fx] = c
+        return new_board
     
-    def is_dangerous(r, c, size):
-        """危険なマス(C, X)を判定"""
-        corners = [(0, 0), (0, size-1), (size-1, 0), (size-1, size-1)]
-        for cr, cc in corners:
-            dist = abs(r - cr) + abs(c - cc)
-            if dist == 1:  # Cマス
-                return 2
-            if dist == 2:  # Xマス
-                return 1
-        return 0
-    
-    def count_empty():
-        """空きマス数を数える"""
-        return sum(1 for r in range(board_size) for c in range(board_size) if board[r][c] == 0)
-    
-    def evaluate_position(r, c, board, color):
-        """ポジションを評価"""
-        flips = count_flips(board, r, c, color)
-        danger = is_dangerous(r, c, board_size)
-        
-        score = flips * 100
-        
-        if danger == 2:
-            score -= 1000
-        elif danger == 1:
-            score -= 300
-        
-        # 隅の優先度
-        if (r, c) in [(0, 0), (0, board_size-1), (board_size-1, 0), (board_size-1, board_size-1)]:
-            score += 500
-        
-        # 辺の優先度
-        if r == 0 or r == board_size - 1 or c == 0 or c == board_size - 1:
-            score += 100
-        
-        # 終盤：相手の選択肢を減らす
-        empty = count_empty()
-        if empty <= board_size * 2:
-            temp_board = [row[:] for row in board]
-            temp_board[r][c] = color
-            opponent_moves = len(get_valid_moves(temp_board, opponent_color))
-            score -= opponent_moves * 50
-        
+    def evaluate_board(b, c):
+        EVAL_TABLE = [
+            [100, -40,  20,   5,   5,  20, -40, 100],
+            [-40, -80,  -1,  -1,  -1,  -1, -80, -40],
+            [ 20,  -1,   5,   1,   1,   5,  -1,  20],
+            [  5,  -1,   1,   0,   0,   1,  -1,   5],
+            [  5,  -1,   1,   0,   0,   1,  -1,   5],
+            [ 20,  -1,   5,   1,   1,   5,  -1,  20],
+            [-40, -80,  -1,  -1,  -1,  -1, -80, -40],
+            [100, -40,  20,   5,   5,  20, -40, 100]
+        ]
+        score = 0
+        for row in range(8):
+            for col in range(8):
+                if b[row][col] == c:
+                    score += EVAL_TABLE[row][col]
+                elif b[row][col] == get_opponent(c):
+                    score -= EVAL_TABLE[row][col]
         return score
     
-    valid_moves = get_valid_moves(board, color)
+    def minimax(b, c, depth, is_max):
+        if depth == 0:
+            return evaluate_board(b, color), None
+        
+        opponent = get_opponent(c)
+        moves = get_valid_moves(b, c)
+        
+        if not moves:
+            moves_opp = get_valid_moves(b, opponent)
+            if not moves_opp:
+                return evaluate_board(b, color), None
+            return minimax(b, opponent, depth - 1, not is_max)
+        
+        best_score = float('-inf') if is_max else float('inf')
+        best_move = None
+        
+        for col, row in moves:
+            new_board = apply_move(b, c, col, row)
+            score, _ = minimax(new_board, opponent, depth - 1, not is_max)
+            
+            if is_max and score > best_score:
+                best_score = score
+                best_move = (col, row)
+            elif not is_max and score < best_score:
+                best_score = score
+                best_move = (col, row)
+        
+        return best_score, best_move
     
-    if not valid_moves:
+    _, move = minimax(board, color, 3, True)
+    
+    if move:
+        return move
+    else:
+        valid_moves = get_valid_moves(board, color)
+        if valid_moves:
+            return valid_moves[0]
         return None
-    
-    best_move = max(valid_moves, key=lambda pos: evaluate_position(pos[0], pos[1], board, color))
-    
-    return (best_move[1], best_move[0])
 
-# Generation ID: Hutch_1763365052161_jzd78n49w (後半)
+# Generation ID: Hutch_1765945221079_jjbnfyfvl (後半)
